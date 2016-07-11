@@ -1,0 +1,29 @@
+{
+    "author": "wdrans@gmail.com",
+    "dependencies": {},
+    "keywords": [],
+    "name": "helium-2",
+    "pebble": {
+        "capabilities": [
+            ""
+        ],
+        "displayName": "HELIUM 2",
+        "enableMultiJS": false,
+        "messageKeys": [],
+        "projectType": "native",
+        "resources": {
+            "media": []
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk"
+        ],
+        "uuid": "6ee4fdd9-bfc8-4de4-8cf9-bcec53cf2507",
+        "watchapp": {
+            "watchface": true
+        }
+    },
+    "version": "1.0.0"
+}
