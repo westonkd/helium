@@ -2,12 +2,12 @@
     "author": "wdrans@gmail.com",
     "dependencies": {},
     "keywords": [],
-    "name": "helium-2",
+    "name": "helium",
     "pebble": {
         "capabilities": [
             ""
         ],
-        "displayName": "HELIUM 2",
+        "displayName": "HELIUM",
         "enableMultiJS": false,
         "messageKeys": [],
         "projectType": "native",

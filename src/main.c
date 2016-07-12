@@ -3,10 +3,12 @@
 #define HOUR_RAD 60
 #define MINUTE_RAD 35
 #define DATE_RAD 15
+#define MARGIN 8
 
 Window *s_main_window;
 static Layer *s_canvas_layer; //Drawing Canvas
 static GFont s_font;
+static int s_battery_level;
 
 static void draw_indicator(int x, int y, uint16_t radius, GContext *ctx) {
   // Get the center and rad
@@ -87,6 +89,24 @@ static void draw_date(GContext *ctx, GPoint center) {
   graphics_draw_text(ctx, date_buffer, fonts_get_system_font(FONT_KEY_LECO_20_BOLD_NUMBERS), GRect((bounds.size.w / 2) - DATE_RAD, (bounds.size.h / 2) - DATE_RAD + 2, DATE_RAD * 2, DATE_RAD * 2), GTextOverflowModeWordWrap, GTextAlignmentCenter , NULL);
 }
 
+static void draw_battery(GContext *ctx, GPoint center) {
+  graphics_draw_circle(ctx, GPoint(center.x * 2 - DATE_RAD - MARGIN, center.y * 2 - DATE_RAD - MARGIN), DATE_RAD);
+  
+  graphics_context_set_text_color(ctx, GColorWhite);
+  
+  static char buf[5];
+  snprintf(buf, sizeof(buf), "%d", s_battery_level);
+  graphics_draw_text(ctx, buf, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GRect(center.x * 2 - DATE_RAD * 2 - MARGIN, center.y * 2 - DATE_RAD * 2 - MARGIN + 2, DATE_RAD * 2, DATE_RAD * 2), GTextOverflowModeWordWrap, GTextAlignmentCenter , NULL);
+}
+
+static void battery_callback(BatteryChargeState state) {
+  //Record the new battery level
+  s_battery_level = state.charge_percent;
+  
+  // Redraw
+  layer_mark_dirty(s_canvas_layer);
+}
+
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   // Get a tm structure
   time_t temp = time(NULL);
@@ -126,10 +146,12 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   
   // Draw the date
   draw_date(ctx, center);
+  
+  // Draw bettery
+  draw_battery(ctx, center);
 }
 
 static void update_time() {
-   
   // Mark Dirty
   layer_mark_dirty(s_canvas_layer);
 }
@@ -155,6 +177,8 @@ static void main_window_load(Window *window) {
   // Add to Window
   layer_add_child(window_get_root_layer(window), s_canvas_layer);
   
+  battery_callback(battery_state_service_peek());
+  
   // Redraw this as soon as possible
   layer_mark_dirty(s_canvas_layer);
 }
@@ -177,6 +201,10 @@ void handle_init(void) {
   
   // Load font
   s_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_SOURCE_CODE_PRO_16));
+  
+  // Register Battery handler and initialize 
+  battery_state_service_subscribe(battery_callback);
+  //battery_callback(battery_state_service_peek());
   
   window_stack_push(s_main_window, true);
 }
