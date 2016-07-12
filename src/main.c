@@ -96,7 +96,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   
   // If the hour is 1
   if (hour == 0) {
-    hour = 1;
+    hour = 12;
   }
   
   GRect bounds = layer_get_bounds(layer);
@@ -121,6 +121,8 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   
   // Draw the minute circle
   draw_indicator((int) get_minute_x(minute, center),(int) get_minute_y(minute, center),3,ctx);
+  
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Hour %d", hour);
   
   // Draw the date
   draw_date(ctx, center);
