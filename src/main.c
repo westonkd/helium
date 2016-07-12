@@ -2,10 +2,11 @@
 
 #define HOUR_RAD 60
 #define MINUTE_RAD 35
+#define DATE_RAD 15
 
 Window *s_main_window;
 static Layer *s_canvas_layer; //Drawing Canvas
-const int hour_angles[] = {0,60,30,0,330,300,270,240,210,180,150,120,90};
+static GFont s_font;
 
 static void draw_indicator(int x, int y, uint16_t radius, GContext *ctx) {
   // Get the center and rad
@@ -17,7 +18,6 @@ static void draw_indicator(int x, int y, uint16_t radius, GContext *ctx) {
 }
 
 static float get_hour_x(int hour, GPoint center) {
-  //check for bounds
   if (hour < 0 || hour > 12) {
     return -1.0;
   }
@@ -30,7 +30,6 @@ static float get_hour_x(int hour, GPoint center) {
 }
 
 static float get_hour_y(int hour, GPoint center) {
-  //check for bounds
   if (hour < 0 || hour > 12) {
     return -1.0;
   }
@@ -42,11 +41,58 @@ static float get_hour_y(int hour, GPoint center) {
   return (-cos_lookup(second_angle) * HOUR_RAD / TRIG_MAX_RATIO) + center.y;
 }
 
+static float get_minute_x(int minute, GPoint center) {
+  if (minute < 0 || minute > 60) {
+    return -1.0;
+  }
+  
+  time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
+  
+  int32_t second_angle = TRIG_MAX_ANGLE * minute / 60;
+  return (sin_lookup(second_angle) * MINUTE_RAD / TRIG_MAX_RATIO) + center.x;  
+}
+
+static float get_minute_y(int minute, GPoint center) {
+  if (minute < 0 || minute > 60) {
+    return -1.0;
+  }
+  
+  time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
+  
+  int32_t second_angle = TRIG_MAX_ANGLE * minute / 60;
+  return (-cos_lookup(second_angle) * MINUTE_RAD / TRIG_MAX_RATIO) + center.y;
+}
+
+static void draw_date(GContext *ctx, GPoint center) {
+  // Get a tm structure
+  time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
+  
+  GRect bounds = layer_get_bounds(s_canvas_layer);
+  
+  // Draw a whole circle
+  graphics_draw_circle(ctx, center, DATE_RAD);
+  graphics_fill_circle(ctx, center, DATE_RAD);
+  
+  // Set the font color
+  graphics_context_set_text_color(ctx, GColorBlack);
+  
+  // Get the day
+  static char date_buffer[5];
+  strftime(date_buffer, sizeof(date_buffer), "%d", tick_time);
+  
+  // Draw the text
+  graphics_draw_text(ctx, date_buffer, fonts_get_system_font(FONT_KEY_LECO_20_BOLD_NUMBERS), GRect((bounds.size.w / 2) - DATE_RAD, (bounds.size.h / 2) - DATE_RAD + 2, DATE_RAD * 2, DATE_RAD * 2), GTextOverflowModeWordWrap, GTextAlignmentCenter , NULL);
+}
+
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   // Get a tm structure
   time_t temp = time(NULL);
   struct tm *tick_time = localtime(&temp);
   int hour = tick_time->tm_hour % 12;
+  int minute = tick_time->tm_min;
   
   // If the hour is 1
   if (hour == 0) {
@@ -74,7 +120,10 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   draw_indicator((int) get_hour_x(hour,center),(int) get_hour_y(hour,center),5,ctx);
   
   // Draw the minute circle
-  draw_indicator(bounds.size.w / 2, MINUTE_RAD - 6,3,ctx);
+  draw_indicator((int) get_minute_x(minute, center),(int) get_minute_y(minute, center),3,ctx);
+  
+  // Draw the date
+  draw_date(ctx, center);
 }
 
 static void update_time() {
@@ -123,6 +172,9 @@ void handle_init(void) {
   
   // Register the time change handler
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
+  
+  // Load font
+  s_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_SOURCE_CODE_PRO_16));
   
   window_stack_push(s_main_window, true);
 }

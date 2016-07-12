@@ -12,7 +12,15 @@
         "messageKeys": [],
         "projectType": "native",
         "resources": {
-            "media": []
+            "media": [
+                {
+                    "characterRegex": "[0-9:.]",
+                    "file": "fonts/SourceCodePro-Light.ttf",
+                    "name": "FONT_SOURCE_CODE_PRO_16",
+                    "targetPlatforms": null,
+                    "type": "font"
+                }
+            ]
         },
         "sdkVersion": "3",
         "targetPlatforms": [
