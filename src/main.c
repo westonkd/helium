@@ -5,6 +5,7 @@
 
 Window *s_main_window;
 static Layer *s_canvas_layer; //Drawing Canvas
+const int hour_angles[] = {0,60,30,0,330,300,270,240,210,180,150,120,90};
 
 static void draw_indicator(int x, int y, uint16_t radius, GContext *ctx) {
   // Get the center and rad
@@ -13,12 +14,35 @@ static void draw_indicator(int x, int y, uint16_t radius, GContext *ctx) {
 
   // Fill a circle
   graphics_fill_circle(ctx, center, radius);
-  
-  // Mark Dirty
-  layer_mark_dirty(s_canvas_layer);
 }
 
-static void update_time() {
+static float get_hour_x(int hour, GPoint center) {
+  //check for bounds
+  if (hour < 0 || hour > 12) {
+    return -1.0;
+  }
+  
+  time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
+  
+  int32_t second_angle = TRIG_MAX_ANGLE * hour / 12;
+  return (sin_lookup(second_angle) * HOUR_RAD / TRIG_MAX_RATIO) + center.x;
+}
+
+static float get_hour_y(int hour, GPoint center) {
+  //check for bounds
+  if (hour < 0 || hour > 12) {
+    return -1.0;
+  }
+  
+  time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
+  
+  int32_t second_angle = TRIG_MAX_ANGLE * hour / 12;
+  return (-cos_lookup(second_angle) * HOUR_RAD / TRIG_MAX_RATIO) + center.y;
+}
+
+static void canvas_update_proc(Layer *layer, GContext *ctx) {
   // Get a tm structure
   time_t temp = time(NULL);
   struct tm *tick_time = localtime(&temp);
@@ -29,14 +53,6 @@ static void update_time() {
     hour = 1;
   }
   
-  //APP_LOG(APP_LOG_LEVEL_DEBUG, "hour: %d", hour);
-}
-
-static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  update_time();
-}
-
-static void canvas_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   // Set the line color
   graphics_context_set_stroke_color(ctx, GColorWhite);
@@ -55,7 +71,20 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_circle(ctx, center, minute_radius);
   
   // Draw the hour circle
-  draw_indicator(25,25,5,ctx);
+  draw_indicator((int) get_hour_x(hour,center),(int) get_hour_y(hour,center),5,ctx);
+  
+  // Draw the minute circle
+  draw_indicator(bounds.size.w / 2, MINUTE_RAD - 6,3,ctx);
+}
+
+static void update_time() {
+   
+  // Mark Dirty
+  layer_mark_dirty(s_canvas_layer);
+}
+
+static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+  update_time();
 }
 
 static void main_window_load(Window *window) {
