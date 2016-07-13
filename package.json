@@ -14,6 +14,12 @@
         "resources": {
             "media": [
                 {
+                    "file": "images/bt-icon.png",
+                    "name": "IMAGE_BLUE",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
                     "characterRegex": "[0-9:.]",
                     "file": "fonts/SourceCodePro-Light.ttf",
                     "name": "FONT_SOURCE_CODE_PRO_16",

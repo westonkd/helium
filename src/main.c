@@ -9,7 +9,45 @@ Window *s_main_window;
 static Layer *s_canvas_layer; //Drawing Canvas
 static GFont s_font;
 static int s_battery_level;
+static bool is_connected;
+static GBitmap *bitmap_blue;
 
+/***********************************************
+* Bluetooth Hanlder
+***********************************************/
+static void bluetooth_callback(bool connected) {
+  is_connected = connected;
+  
+  if (!connected) {
+    vibes_double_pulse();
+  }
+  
+  layer_mark_dirty(s_canvas_layer);
+}
+
+static void draw_bluetooth(GContext *ctx, GPoint center) {
+  if (!is_connected) {
+    // Draw the circle
+    graphics_draw_circle(ctx, GPoint(DATE_RAD + MARGIN, DATE_RAD + MARGIN), DATE_RAD);
+    
+    // Get the bounds of the image
+    GRect bitmap_bounds = gbitmap_get_bounds(bitmap_blue);
+    
+    bitmap_bounds.origin = GPoint(DATE_RAD, DATE_RAD);
+    
+    // Set the compositing mode (GCompOpSet is required for transparency)
+    graphics_context_set_compositing_mode(ctx, GCompOpSet);
+    
+    // Draw the image
+    graphics_draw_bitmap_in_rect(ctx, bitmap_blue, bitmap_bounds);
+    
+  }
+}
+
+/***********************************************
+* Draws a circle at the specified coordinates
+* using the specified radius and context
+***********************************************/
 static void draw_indicator(int x, int y, uint16_t radius, GContext *ctx) {
   // Get the center and rad
   GPoint center = GPoint(x, y);
@@ -19,6 +57,9 @@ static void draw_indicator(int x, int y, uint16_t radius, GContext *ctx) {
   graphics_fill_circle(ctx, center, radius);
 }
 
+/***********************************************
+* Helpers to get coordinates
+***********************************************/
 static float get_hour_x(int hour, GPoint center) {
   if (hour < 0 || hour > 12) {
     return -1.0;
@@ -67,6 +108,9 @@ static float get_minute_y(int minute, GPoint center) {
   return (-cos_lookup(second_angle) * MINUTE_RAD / TRIG_MAX_RATIO) + center.y;
 }
 
+/***********************************************
+* Draw the Date circle and text
+***********************************************/
 static void draw_date(GContext *ctx, GPoint center) {
   // Get a tm structure
   time_t temp = time(NULL);
@@ -89,6 +133,9 @@ static void draw_date(GContext *ctx, GPoint center) {
   graphics_draw_text(ctx, date_buffer, fonts_get_system_font(FONT_KEY_LECO_20_BOLD_NUMBERS), GRect((bounds.size.w / 2) - DATE_RAD, (bounds.size.h / 2) - DATE_RAD + 2, DATE_RAD * 2, DATE_RAD * 2), GTextOverflowModeWordWrap, GTextAlignmentCenter , NULL);
 }
 
+/***********************************************
+* Battery draw and callback
+***********************************************/
 static void draw_battery(GContext *ctx, GPoint center) {
   graphics_draw_circle(ctx, GPoint(center.x * 2 - DATE_RAD - MARGIN, center.y * 2 - DATE_RAD - MARGIN), DATE_RAD);
   
@@ -107,6 +154,9 @@ static void battery_callback(BatteryChargeState state) {
   layer_mark_dirty(s_canvas_layer);
 }
 
+/***********************************************
+* Update the canvas layer
+***********************************************/
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   // Get a tm structure
   time_t temp = time(NULL);
@@ -149,6 +199,9 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   
   // Draw bettery
   draw_battery(ctx, center);
+  
+  // Draw bluetooth indicator
+  draw_bluetooth(ctx, center);
 }
 
 static void update_time() {
@@ -160,6 +213,9 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
 }
 
+/***********************************************
+* Load the main window
+***********************************************/
 static void main_window_load(Window *window) {
   // Get information about the Window
   Layer *window_layer = window_get_root_layer(window);
@@ -177,7 +233,13 @@ static void main_window_load(Window *window) {
   // Add to Window
   layer_add_child(window_get_root_layer(window), s_canvas_layer);
   
+  // Initialize battery indicator
   battery_callback(battery_state_service_peek());
+  
+  // Initialize Bluetooth moniter
+  bluetooth_callback(connection_service_peek_pebble_app_connection());
+  bitmap_blue = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BLUE);
+
   
   // Redraw this as soon as possible
   layer_mark_dirty(s_canvas_layer);
@@ -187,6 +249,9 @@ static void main_window_unload(Window *window) {
   layer_destroy(s_canvas_layer);
 }
 
+/***********************************************
+* Initialize
+***********************************************/
 void handle_init(void) {
   s_main_window = window_create();
 
@@ -204,13 +269,19 @@ void handle_init(void) {
   
   // Register Battery handler and initialize 
   battery_state_service_subscribe(battery_callback);
-  //battery_callback(battery_state_service_peek());
+  
+  // Register for Bluetooth connection updates
+  connection_service_subscribe((ConnectionHandlers) {
+    .pebble_app_connection_handler = bluetooth_callback
+  });
   
   window_stack_push(s_main_window, true);
 }
 
 void handle_deinit(void) {
   window_destroy(s_main_window);
+  
+  gbitmap_destroy(bitmap_blue);
 }
 
 int main(void) {
