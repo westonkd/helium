@@ -10,7 +10,31 @@ static Layer *s_canvas_layer; //Drawing Canvas
 static GFont s_font;
 static int s_battery_level;
 static bool is_connected;
+static bool show_battery;
 static GBitmap *bitmap_blue;
+
+/***********************************************
+* Configuration management
+***********************************************/
+static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) {
+  Tuple *battery_t = dict_find(iter, MESSAGE_KEY_ShowBattery);
+  Tuple *minute_on_out_t = dict_find(iter, MESSAGE_KEY_MinuteOnOut);
+  
+  // Persist the changes
+  if (battery_t->value->int32 == 1) {
+      persist_write_int(MESSAGE_KEY_ShowBattery, 1);
+  } else {
+      persist_write_int(MESSAGE_KEY_ShowBattery, -1);  
+  }
+  
+  if (minute_on_out_t->value->int32 == 1) {
+      persist_write_int(MESSAGE_KEY_MinuteOnOut, 1);
+  } else {
+      persist_write_int(MESSAGE_KEY_MinuteOnOut, -1);  
+  }
+
+  layer_mark_dirty(s_canvas_layer);
+}
 
 /***********************************************
 * Bluetooth Hanlder
@@ -28,12 +52,20 @@ static void bluetooth_callback(bool connected) {
 static void draw_bluetooth(GContext *ctx, GPoint center) {
   if (!is_connected) {
     // Draw the circle
-    graphics_draw_circle(ctx, GPoint(DATE_RAD + MARGIN, DATE_RAD + MARGIN), DATE_RAD);
+    #if defined(PBL_ROUND)
+        graphics_draw_circle(ctx, GPoint(DATE_RAD + (MARGIN * 2 + 5), DATE_RAD + (MARGIN * 2 + 5)), DATE_RAD);
+    #else
+        graphics_draw_circle(ctx, GPoint(DATE_RAD + MARGIN, DATE_RAD + MARGIN), DATE_RAD);
+    #endif
     
     // Get the bounds of the image
     GRect bitmap_bounds = gbitmap_get_bounds(bitmap_blue);
     
-    bitmap_bounds.origin = GPoint(DATE_RAD, DATE_RAD);
+    #if defined(PBL_ROUND)
+      bitmap_bounds.origin = GPoint(DATE_RAD + MARGIN * 2 - 2, DATE_RAD + MARGIN * 2 - 2);
+    #else
+      bitmap_bounds.origin = GPoint(DATE_RAD, DATE_RAD);
+    #endif
     
     // Set the compositing mode (GCompOpSet is required for transparency)
     graphics_context_set_compositing_mode(ctx, GCompOpSet);
@@ -65,6 +97,8 @@ static float get_hour_x(int hour, GPoint center) {
     return -1.0;
   }
   
+  int radius = (persist_read_int(MESSAGE_KEY_MinuteOnOut) != 1) ? HOUR_RAD : MINUTE_RAD; 
+  
   time_t temp = time(NULL);
   struct tm *tick_time = localtime(&temp);
   
@@ -77,11 +111,13 @@ static float get_hour_y(int hour, GPoint center) {
     return -1.0;
   }
   
+  int radius = (persist_read_int(MESSAGE_KEY_MinuteOnOut) != 1) ? HOUR_RAD : MINUTE_RAD; 
+  
   time_t temp = time(NULL);
   struct tm *tick_time = localtime(&temp);
   
   int32_t second_angle = TRIG_MAX_ANGLE * hour / 12;
-  return (-cos_lookup(second_angle) * HOUR_RAD / TRIG_MAX_RATIO) + center.y;
+  return (-cos_lookup(second_angle) * radius / TRIG_MAX_RATIO) + center.y;
 }
 
 static float get_minute_x(int minute, GPoint center) {
@@ -89,11 +125,13 @@ static float get_minute_x(int minute, GPoint center) {
     return -1.0;
   }
   
+  int radius = (persist_read_int(MESSAGE_KEY_MinuteOnOut) != 1) ? MINUTE_RAD : HOUR_RAD; 
+  
   time_t temp = time(NULL);
   struct tm *tick_time = localtime(&temp);
   
   int32_t second_angle = TRIG_MAX_ANGLE * minute / 60;
-  return (sin_lookup(second_angle) * MINUTE_RAD / TRIG_MAX_RATIO) + center.x;  
+  return (sin_lookup(second_angle) * radius / TRIG_MAX_RATIO) + center.x;  
 }
 
 static float get_minute_y(int minute, GPoint center) {
@@ -101,11 +139,13 @@ static float get_minute_y(int minute, GPoint center) {
     return -1.0;
   }
   
+  int radius = (persist_read_int(MESSAGE_KEY_MinuteOnOut) != 1) ? MINUTE_RAD : HOUR_RAD; 
+  
   time_t temp = time(NULL);
   struct tm *tick_time = localtime(&temp);
   
   int32_t second_angle = TRIG_MAX_ANGLE * minute / 60;
-  return (-cos_lookup(second_angle) * MINUTE_RAD / TRIG_MAX_RATIO) + center.y;
+  return (-cos_lookup(second_angle) * radius / TRIG_MAX_RATIO) + center.y;
 }
 
 /***********************************************
@@ -137,13 +177,23 @@ static void draw_date(GContext *ctx, GPoint center) {
 * Battery draw and callback
 ***********************************************/
 static void draw_battery(GContext *ctx, GPoint center) {
-  graphics_draw_circle(ctx, GPoint(center.x * 2 - DATE_RAD - MARGIN, center.y * 2 - DATE_RAD - MARGIN), DATE_RAD);
+  if (persist_read_int(MESSAGE_KEY_ShowBattery) != -1) {
+    #if defined(PBL_ROUND)
+    graphics_draw_circle(ctx, GPoint(center.x * 2 - DATE_RAD - (MARGIN * 2 + 5), center.y * 2 - DATE_RAD - (MARGIN * 2 + 5)), DATE_RAD - 2);
+    graphics_context_set_text_color(ctx, GColorWhite);
   
-  graphics_context_set_text_color(ctx, GColorWhite);
+    static char buf[5];
+    snprintf(buf, sizeof(buf), "%d", s_battery_level);
+    graphics_draw_text(ctx, buf, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GRect(center.x * 2 - DATE_RAD * 2 - (MARGIN * 2 + 5), center.y * 2 - DATE_RAD * 2 - (MARGIN * 2 + 5) + 2, DATE_RAD * 2, DATE_RAD * 2), GTextOverflowModeWordWrap, GTextAlignmentCenter , NULL);
+    #else
+    graphics_draw_circle(ctx, GPoint(center.x * 2 - DATE_RAD - MARGIN, center.y * 2 - DATE_RAD - MARGIN), DATE_RAD);
+    graphics_context_set_text_color(ctx, GColorWhite);
   
-  static char buf[5];
-  snprintf(buf, sizeof(buf), "%d", s_battery_level);
-  graphics_draw_text(ctx, buf, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GRect(center.x * 2 - DATE_RAD * 2 - MARGIN, center.y * 2 - DATE_RAD * 2 - MARGIN + 2, DATE_RAD * 2, DATE_RAD * 2), GTextOverflowModeWordWrap, GTextAlignmentCenter , NULL);
+    static char buf[5];
+    snprintf(buf, sizeof(buf), "%d", s_battery_level);
+    graphics_draw_text(ctx, buf, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), GRect(center.x * 2 - DATE_RAD * 2 - MARGIN, center.y * 2 - DATE_RAD * 2 - MARGIN + 2, DATE_RAD * 2, DATE_RAD * 2), GTextOverflowModeWordWrap, GTextAlignmentCenter , NULL);
+    #endif
+  } 
 }
 
 static void battery_callback(BatteryChargeState state) {
@@ -274,6 +324,10 @@ void handle_init(void) {
   connection_service_subscribe((ConnectionHandlers) {
     .pebble_app_connection_handler = bluetooth_callback
   });
+  
+   // Open AppMessage connection
+  app_message_register_inbox_received(prv_inbox_received_handler);
+  app_message_open(128, 128);
   
   window_stack_push(s_main_window, true);
 }

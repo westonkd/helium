@@ -1,15 +1,20 @@
 {
     "author": "wdrans@gmail.com",
-    "dependencies": {},
+    "dependencies": {
+        "pebble-clay": "^1.0.2"
+    },
     "keywords": [],
     "name": "helium",
     "pebble": {
         "capabilities": [
-            ""
+            "configurable"
         ],
         "displayName": "HELIUM",
-        "enableMultiJS": false,
-        "messageKeys": [],
+        "enableMultiJS": true,
+        "messageKeys": [
+            "ShowBattery",
+            "MinuteOnOut"
+        ],
         "projectType": "native",
         "resources": {
             "media": [
@@ -34,7 +39,7 @@
             "basalt",
             "chalk"
         ],
-        "uuid": "6ee4fdd9-bfc8-4de4-8cf9-bcec53cf2507",
+        "uuid": "4122755f-f8a2-4509-b6f6-fe1d587fad74",
         "watchapp": {
             "watchface": true
         }
